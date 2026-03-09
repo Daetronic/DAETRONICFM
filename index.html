@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="origin">
+    <title>DAETRONICFM BETA v0.1</title>
+	<link rel="icon" type="image/png" href="images/favicon.png">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Poppins:wght@300;500&display=swap">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #0a0015;
+            color: #e0e0ff;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        #videoContainer { flex: 1; position: relative; background: black; }
+        #player { width: 100%; height: 100%; }
+        #infoBar {
+            position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.65); backdrop-filter: blur(6px);
+            padding: 10px 24px; border-radius: 12px; border: 1px solid #00ff9d33;
+            text-align: center; max-width: 80%; pointer-events: none; z-index: 20;
+        }
+        #songTitle { font-family: 'Orbitron', sans-serif; font-size: 1.5rem; color: #00ff9d; }
+        #artistName { font-size: 1.1rem; color: #c0c0ff; margin-top: 4px; }
+
+        #controls {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            display: flex; align-items: center; gap: 30px;
+            background: rgba(10,5,30,0.7); backdrop-filter: blur(10px);
+            padding: 16px 40px; border-radius: 999px; border: 1px solid #00ff9d44;
+            box-shadow: 0 8px 30px rgba(0,255,157,0.15); z-index: 30;
+            transition: all 0.4s ease;
+        }
+        #controls.hidden { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(80px); }
+
+        .btn {
+            background: none; border: 2px solid #00ff9d; color: #00ff9d;
+            width: 60px; height: 60px; border-radius: 50%; font-size: 1.7rem;
+            cursor: pointer; transition: all 0.25s;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Orbitron', sans-serif;
+        }
+        .btn:hover { background: #00ff9d22; transform: scale(1.12); box-shadow: 0 0 20px #00ff9d66; }
+
+        #hideControlsBtn {
+            position: fixed; bottom: 16px; right: 24px;
+            background: rgba(0,0,0,0.5); color: #aaa; border: 1px solid #555;
+            padding: 10px 16px; border-radius: 999px; font-size: 0.9rem;
+            cursor: pointer; z-index: 25; transition: all 0.3s;
+        }
+        #hideControlsBtn:hover { background: #00ff9d33; color: white; border-color: #00ff9d; }
+
+        #progressContainer { width: 100%; height: 8px; background: rgba(255,255,255,0.1); cursor: pointer; margin-top: 10px; }
+        #progressBar { height: 100%; width: 0; background: #00ff9d; transition: width 0.1s linear; }
+        #timeDisplay { text-align: center; font-size: 0.9rem; margin-top: 5px; color: #ddd; }
+        #volumeContainer { display: flex; align-items: center; gap: 10px; }
+        #volumeSlider { width: 100px; accent-color: #00ff9d; }
+
+        #nextTrack {
+            position: absolute; top: 12px; right: 20px;
+            background: rgba(0,0,0,0.65); backdrop-filter: blur(6px);
+            padding: 10px 16px; border-radius: 12px; border: 1px solid #00ff9d33;
+            text-align: right; z-index: 20; font-size: 0.95rem;
+        }
+        #nextTitle { color: #00ff9d; font-weight: bold; }
+
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 40; justify-content: center; align-items: center; }
+        .modal-content {
+            background: rgba(10,5,30,0.92); padding: 28px; border-radius: 16px;
+            max-width: 640px; width: 90%; max-height: 85vh; overflow-y: auto;
+            position: relative; border: 1px solid rgba(0,255,157,0.3);
+        }
+        .close { position: absolute; top: 12px; right: 20px; color: #ff6b6b; font-size: 2.2rem; cursor: pointer; font-weight: bold; }
+        .close:hover { color: white; transform: scale(1.15); }
+
+        #trackSearch { width: 100%; padding: 12px; margin: 15px 0 10px; background: rgba(255,255,255,0.08); border: 1px solid #00ff9d66; border-radius: 8px; color: white; font-size: 1rem; }
+        #trackListUl { list-style: none; }
+        #trackListUl li {
+            padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.08); cursor: pointer; transition: background 0.2s;
+        }
+        #trackListUl li:hover { background: rgba(0,255,157,0.12); }
+        .delete-btn {
+            background: none; border: none; color: #ff6b6b; font-size: 1.4rem;
+            cursor: pointer; padding: 4px 10px;
+        }
+        .delete-btn:hover { color: white; transform: scale(1.3); }
+
+        #addSongForm { margin-top: 30px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.15); }
+        #addSongForm h3 { margin-bottom: 15px; color: #00ff9d; }
+        #addSongForm input {
+            width: 100%; padding: 12px; margin-bottom: 12px;
+            background: rgba(255,255,255,0.08); border: 1px solid #00ff9d66; border-radius: 8px; color: white;
+        }
+        #addSongBtn {
+            background: #00ff9d; color: #0a0015; border: none; padding: 12px 24px;
+            border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%;
+        }
+
+        #lyricsModal .modal-content { text-align: center; padding: 40px 30px; }
+        #lyricsContent h3 { color: #00ff9d; margin-bottom: 20px; font-size: 1.6rem; }
+        #currentSongInfo { margin: 20px 0 30px; font-size: 1.1rem; line-height: 1.6; }
+        #openGeniusBtn {
+            padding: 16px 40px; background: linear-gradient(135deg, #00ff9d, #00d68f);
+            color: #0a0015; border: none; border-radius: 50px; font-size: 1.2rem;
+            font-weight: bold; cursor: pointer; box-shadow: 0 6px 20px rgba(0,255,157,0.4);
+            transition: all 0.25s;
+        }
+        #openGeniusBtn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,255,157,0.6); }
+        .note { margin-top: 30px; font-size: 0.9rem; color: #aaa; line-height: 1.5; }
+    </style>
+</head>
+<body>
+
+<div id="videoContainer">
+    <div id="player"></div>
+    <div id="infoBar">
+        <div id="songTitle">Select a track</div>
+        <div id="artistName">&nbsp;</div>
+    </div>
+    <div id="nextTrack">
+        Next: <span id="nextTitle"></span> by <span id="nextArtist"></span>
+    </div>
+</div>
+
+<div id="controls">
+    <button class="btn" id="prevBtn" title="Previous">«</button>
+    <button class="btn" id="togglePlayBtn" title="Play / Pause">▶</button>
+    <button class="btn" id="nextBtn" title="Next">»</button>
+    <button class="btn" id="tracklistBtn" title="Tracklist">📜</button>
+    <button class="btn" id="lyricsBtn" title="Lyrics">🎤</button>
+    <div id="volumeContainer">
+        <input type="range" id="volumeSlider" min="0" max="100" value="100">
+    </div>
+</div>
+<div id="progressContainer"><div id="progressBar"></div></div>
+<div id="timeDisplay">0:00 / 0:00</div>
+
+<button id="hideControlsBtn">Hide controls</button>
+
+<div id="tracklistModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closeTracklist">×</span>
+        <h2>Tracklist</h2>
+        <input type="text" id="trackSearch" placeholder="Search tracks...">
+        <ul id="trackListUl"></ul>
+        <div id="addSongForm">
+            <h3>Add New Song</h3>
+            <input type="text" id="newTitle" placeholder="Title">
+            <input type="text" id="newArtist" placeholder="Artist">
+            <input type="text" id="newYoutubeId" placeholder="YouTube Video ID (e.g. dQw4w9WgXcQ)">
+            <button id="addSongBtn">Add to Playlist</button>
+        </div>
+    </div>
+</div>
+
+<div id="lyricsModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closeLyrics">×</span>
+        <h3>Lyrics via Genius</h3>
+        <div id="lyricsContent">
+            <div id="currentSongInfo"></div>
+            <button id="openGeniusBtn">Open Lyrics on Genius →</button>
+            <p class="note">Genius provides the most accurate and up-to-date lyrics (including annotations when available).<br>Opening in a new tab for best experience.</p>
+        </div>
+    </div>
+</div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+
+let videos = JSON.parse(localStorage.getItem('daetronicVideos')) || [
+    { title: "SLIDE", artist: "KanYe West", youtubeId: "IAh3r5egwzA" },
+    { title: "Flashing Lights", artist: "KanYe West", youtubeId: "ila-hAUXR5U" },
+    { title: "LEMONHEAD", artist: "Tyler, The Creator", youtubeId: "a5JCltuobqQ" },
+    { title: "See You Again", artist: "Tyler, The Creator", youtubeId: "TGgcC5xg9YI" },
+    { title: "N95", artist: "Kendrick Lamar", youtubeId: "zI383uEwA6Q" },
+    { title: "squabble up", artist: "Kendrick Lamar", youtubeId: "fuV4yQWdn_4" }
+];
+
+let queue = [];
+let playedThisCycle = [];
+let currentVid = null;
+let nextVid = null;
+let player;
+let isPlaying = false;
+let controlsVisible = true;
+let progressInterval;
+
+const els = {
+    title: document.getElementById("songTitle"),
+    artist: document.getElementById("artistName"),
+    prevBtn: document.getElementById("prevBtn"),
+    nextBtn: document.getElementById("nextBtn"),
+    toggleBtn: document.getElementById("togglePlayBtn"),
+    hideBtn: document.getElementById("hideControlsBtn"),
+    progressBar: document.getElementById("progressBar"),
+    timeDisplay: document.getElementById("timeDisplay"),
+    volumeSlider: document.getElementById("volumeSlider"),
+    nextTitle: document.getElementById("nextTitle"),
+    nextArtist: document.getElementById("nextArtist"),
+    tracklistBtn: document.getElementById("tracklistBtn"),
+    lyricsBtn: document.getElementById("lyricsBtn"),
+    tracklistModal: document.getElementById("tracklistModal"),
+    lyricsModal: document.getElementById("lyricsModal"),
+    closeTracklist: document.getElementById("closeTracklist"),
+    closeLyrics: document.getElementById("closeLyrics"),
+    trackSearch: document.getElementById("trackSearch"),
+    trackListUl: document.getElementById("trackListUl"),
+    newTitle: document.getElementById("newTitle"),
+    newArtist: document.getElementById("newArtist"),
+    newYoutubeId: document.getElementById("newYoutubeId"),
+    addSongBtn: document.getElementById("addSongBtn"),
+    lyricsContent: document.getElementById("lyricsContent"),
+    currentSongInfo: document.getElementById("currentSongInfo"),
+};
+
+//shuffle anf queue
+function shuffle(array) {
+    const arr = [...array];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+function refillQueue() { queue = shuffle(videos); playedThisCycle = []; }
+
+function getNextRandomVideo() {
+    if (queue.length === 0) refillQueue();
+    const vid = queue.pop();
+    playedThisCycle.push(vid);
+    return vid;
+}
+
+function updateNextDisplay() {
+    els.nextTitle.textContent = nextVid?.title || "—";
+    els.nextArtist.textContent = nextVid?.artist || "—";
+}
+
+function loadVideo(vid) {
+    currentVid = vid;
+    player.loadVideoById(vid.youtubeId);
+    els.title.textContent = vid.title || "Unknown Track";
+    els.artist.textContent = vid.artist || "Unknown Artist";
+
+    nextVid = getNextRandomVideo();
+    updateNextDisplay();
+
+    player.playVideo();
+    els.toggleBtn.textContent = "❚❚";
+    isPlaying = true;
+}
+
+function onPlayerReady() {
+    els.volumeSlider.value = player.getVolume();
+    progressInterval = setInterval(updateProgress, 1000);
+}
+
+function onPlayerStateChange(event) {
+    if (event.data === YT.PlayerState.PLAYING) {
+        isPlaying = true; els.toggleBtn.textContent = "❚❚";
+    } else if (event.data === YT.PlayerState.PAUSED) {
+        isPlaying = false; els.toggleBtn.textContent = "▶";
+    } else if (event.data === YT.PlayerState.ENDED) {
+        loadVideo(nextVid);
+    }
+}
+
+window.onYouTubeIframeAPIReady = () => {
+    player = new YT.Player('player', {
+        height: '100%', width: '100%',
+        playerVars: { autoplay: 1, controls: 0, modestbranding: 1, rel: 0, fs: 1, iv_load_policy: 3 },
+        events: { onReady: onPlayerReady, onStateChange: onPlayerStateChange }
+    });
+};
+
+function play() { player.playVideo(); }
+function pause() { player.pauseVideo(); }
+function togglePlayPause() { isPlaying ? pause() : play(); }
+
+function formatTime(s) {
+    if (isNaN(s)) return '0:00';
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2,'0')}`;
+}
+
+function updateProgress() {
+    if (!player) return;
+    const cur = player.getCurrentTime();
+    const dur = player.getDuration();
+    els.progressBar.style.width = dur ? `${(cur / dur) * 100}%` : '0%';
+    els.timeDisplay.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
+}
+
+//button clicks only – no keybinds, otherwise it shits itself
+els.prevBtn.onclick = () => loadVideo(getNextRandomVideo());
+els.nextBtn.onclick = () => loadVideo(nextVid);
+els.toggleBtn.onclick = togglePlayPause;
+
+els.hideBtn.onclick = () => {
+    controlsVisible = !controlsVisible;
+    document.getElementById("controls").classList.toggle("hidden", !controlsVisible);
+    document.getElementById("progressContainer").style.display = controlsVisible ? "block" : "none";
+    document.getElementById("timeDisplay").style.display = controlsVisible ? "block" : "none";
+    els.hideBtn.textContent = controlsVisible ? "Hide controls" : "Show controls";
+    document.getElementById("infoBar").style.opacity = controlsVisible ? "1" : "0.3";
+};
+
+els.volumeSlider.oninput = () => player.setVolume(els.volumeSlider.value);
+
+document.getElementById("progressContainer").onclick = (e) => {
+    const rect = document.getElementById("progressContainer").getBoundingClientRect();
+    const pos = (e.clientX - rect.left) / rect.width;
+    player.seekTo(pos * player.getDuration(), true);
+};
+
+// Tracklist
+els.tracklistBtn.onclick = () => {
+    els.tracklistModal.style.display = "flex";
+    populateTracklist();
+};
+els.closeTracklist.onclick = () => els.tracklistModal.style.display = "none";
+els.trackSearch.oninput = () => populateTracklist(els.trackSearch.value);
+
+function populateTracklist(search = '') {
+    els.trackListUl.innerHTML = '';
+    const q = search.toLowerCase();
+    videos.forEach((vid, index) => {
+        if (!search || vid.title.toLowerCase().includes(q) || vid.artist.toLowerCase().includes(q)) {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <span>${vid.title} – ${vid.artist}</span>
+                <button class="delete-btn" data-index="${index}">×</button>
+            `;
+            li.querySelector('span').onclick = () => {
+                loadVideo(vid);
+                els.tracklistModal.style.display = "none";
+            };
+            li.querySelector('.delete-btn').onclick = (e) => {
+                e.stopPropagation();
+                if (confirm(`Remove "${vid.title}" by ${vid.artist}?`)) {
+                    videos.splice(index, 1);
+                    localStorage.setItem('daetronicVideos', JSON.stringify(videos));
+                    populateTracklist(els.trackSearch.value);
+                }
+            };
+            els.trackListUl.appendChild(li);
+        }
+    });
+}
+
+els.addSongBtn.onclick = () => {
+    const t = els.newTitle.value.trim();
+    const a = els.newArtist.value.trim();
+    const id = els.newYoutubeId.value.trim();
+    if (t && a && id.length >= 8) {
+        videos.push({ title: t, artist: a, youtubeId: id });
+        localStorage.setItem('daetronicVideos', JSON.stringify(videos));
+        populateTracklist(els.trackSearch.value);
+        els.newTitle.value = els.newArtist.value = els.newYoutubeId.value = '';
+    } else {
+        alert("Please fill all fields (YouTube ID from video URL).");
+    }
+};
+
+// Genius Lyrics
+els.lyricsBtn.onclick = () => {
+    if (!currentVid) {
+        alert("No song is playing yet.");
+        return;
+    }
+
+    els.lyricsModal.style.display = "flex";
+
+    const artist = currentVid.artist.replace(/feat\.|ft\./gi, '').trim();
+    const title  = currentVid.title.replace(/\(.*?\)|\[.*?\]/g, '').trim();
+
+    els.currentSongInfo.innerHTML = `
+        <strong style="font-size:1.4rem; color:#00ff9d;">${currentVid.title}</strong><br>
+        <span style="color:#aaa;">by ${currentVid.artist}</span>
+    `;
+
+    document.getElementById("openGeniusBtn").onclick = () => {
+        const query = encodeURIComponent(`${artist} ${title}`);
+        window.open(`https://genius.com/search?q=${query}`, '_blank');
+        els.lyricsModal.style.display = "none";
+    };
+};
+
+els.closeLyrics.onclick = () => els.lyricsModal.style.display = "none";
+
+//start
+refillQueue();
+nextVid = getNextRandomVideo();
+updateNextDisplay();
+loadVideo(getNextRandomVideo());
+
+//close modals on outside click
+window.onclick = (e) => {
+    if (e.target === els.tracklistModal) els.tracklistModal.style.display = "none";
+    if (e.target === els.lyricsModal) els.lyricsModal.style.display = "none";
+};
+</script>
+</body>
+</html>
